@@ -1,38 +1,33 @@
 #!/bin/bash
-# Installer Theme Pterodactyl Panel (Ubuntu 16–24)
-PANEL_ROOT="/var/www/pterodactyl"
-THEME_SOURCE="theme"
+set -e
 
-if [ "$EUID" -ne 0 ]; then
-  echo "❌ Run as root!"
-  exit 1
+# Path repo
+REPO_DIR="$(pwd)"
+THEME_SRC="$REPO_DIR/theme"
+THEME_DEST="/var/www/pterodactyl/resources/theme"
+
+# Cek folder theme
+if [ ! -d "$THEME_SRC" ]; then
+    echo "ERROR: Folder theme tidak ditemukan di $THEME_SRC"
+    exit 1
 fi
 
-cd "$PANEL_ROOT" || { echo "❌ Panel not found!"; exit 1; }
-
-# Install Node.js if missing
-if ! command -v node >/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y nodejs
+# Backup resources lama jika ada
+if [ -d "$THEME_DEST" ]; then
+    mv "$THEME_DEST" "${THEME_DEST}_backup_$(date +%F_%H%M%S)"
 fi
-
-# Backup resources
-cp -r resources resources_backup_$(date +%s)
-
-# Clean dependencies
-rm -rf node_modules package-lock.json yarn.lock
-npm cache clean --force
-
-# Install & build
-npm install --legacy-peer-deps
-npm run build
 
 # Copy theme
-cp -r "$THEME_SOURCE/." "$PANEL_ROOT/resources/"
+cp -r "$THEME_SRC" "$THEME_DEST"
 
-# Clear cache & fix permission
-php artisan optimize:clear
-chown -R www-data:www-data "$PANEL_ROOT"
-chmod -R 755 "$PANEL_ROOT"
+# Fix permission
+chown -R www-data:www-data "$THEME_DEST"
+chmod -R 755 "$THEME_DEST"
+
+# Clear Laravel cache
+cd /var/www/pterodactyl
+php artisan view:clear
+php artisan cache:clear
+php artisan config:clear
 
 echo "✅ Theme installed successfully!"
